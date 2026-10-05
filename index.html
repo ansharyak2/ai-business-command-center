@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AI Business"><link rel="manifest" href="manifest.json">
+<title>AI Business Command Center</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+.wrap{max-width:650px;margin:auto;padding:18px}.card{background:#fff;border-radius:20px;padding:20px;box-shadow:0 8px 30px #0001;margin-top:18px}
+h1{font-size:25px;margin:0 0 6px}.sub{color:#6b7280;margin-bottom:18px}
+textarea{width:100%;min-height:150px;border:1px solid #d1d5db;border-radius:14px;padding:14px;font-size:17px;resize:vertical}
+.row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}button{border:0;border-radius:12px;padding:13px 17px;font-size:16px;font-weight:700;cursor:pointer}
+.voice{background:#111827;color:white;flex:1}.stop{background:#e5e7eb}.send{background:#2563eb;color:white;width:100%}
+button:disabled{opacity:.5}#status{margin-top:14px;padding:12px;border-radius:12px;background:#f3f4f6;line-height:1.4}
+.examples{font-size:14px;color:#4b5563;line-height:1.6}.small{font-size:12px;color:#6b7280;margin-top:10px}
+</style></head><body><div class="wrap"><div class="card">
+<h1>🎤 AI Business Command Center</h1><div class="sub">Voice / Text → Gemini → Google Sheets</div>
+<textarea id="command" placeholder="Speak or type your business command..."></textarea>
+<div class="row"><button class="voice" id="speak">🎤 Speak</button><button class="stop" id="stop" disabled>⏹ Stop</button></div>
+<div class="row"><button class="send" id="send">🚀 Process Command</button></div>
+<div id="status">Ready.</div>
+<div class="examples"><b>Examples:</b><br>
+“Avinash driver ko 150 rupaye khana ke liye diye.”<br>
+“Kal Bihta B2B site ke liye 20 panels warehouse se bhejne hain.”<br>
+“Railway project ke liye kal 11 baje Rahul aur Rakesh site visit karenge.”</div>
+<div class="small">Microphone works best over HTTPS with microphone permission allowed.</div>
+</div></div>
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbx9vfkUVtGAGoh5hqeOQocoRAjgW2ELHHnRlIYWtrY4BomqgQBMcvAGwBaofOju8lSG/exec";
+const box=document.getElementById('command'), statusBox=document.getElementById('status');
+const speak=document.getElementById('speak'), stop=document.getElementById('stop'), send=document.getElementById('send');
+let recognition=null,listening=false;
+function status(x,good=false){statusBox.textContent=x;statusBox.style.background=good?'#ecfdf5':'#f3f4f6'}
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){
+ recognition=new SR();recognition.lang='hi-IN';recognition.continuous=false;recognition.interimResults=true;
+ recognition.onstart=()=>{listening=true;speak.disabled=true;stop.disabled=false;status('🎤 Listening... बोलिए')};
+ recognition.onresult=e=>{let t='';for(let i=e.resultIndex;i<e.results.length;i++)t+=e.results[i][0].transcript;box.value=t};
+ recognition.onerror=e=>{listening=false;speak.disabled=false;stop.disabled=true;status('Voice error: '+e.error+'. Microphone permission check करें.')};
+ recognition.onend=()=>{listening=false;speak.disabled=false;stop.disabled=true;if(box.value.trim())status('✅ Voice captured. अब Process Command दबाएँ.')};
+}else{ speak.disabled=true;status('इस browser में voice recognition उपलब्ध नहीं है. Chrome/compatible browser try करें.') }
+speak.onclick=async()=>{if(!recognition)return;try{if(navigator.mediaDevices?.getUserMedia)await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){}box.value='';recognition.start()};
+stop.onclick=()=>{if(recognition&&listening)recognition.stop()};
+send.onclick=async()=>{
+ const command=box.value.trim();if(!command){status('⚠️ पहले command बोलें या type करें.');return}
+ send.disabled=true;status('⏳ Processing...');
+ try{
+  const r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({command})});
+  const txt=await r.text();let d=null;try{d=JSON.parse(txt)}catch(e){}
+  if(d&&d.ok)status('✅ Command successfully processed and sent to Google Sheet.',true);
+  else if(d&&d.error)status('❌ '+d.error);
+  else status('⚠️ Request sent. Response: '+txt.slice(0,250));
+ }catch(e){status('❌ Connection/CORS error: '+e.message)}
+ finally{send.disabled=false}
+};
+</script></body></html>
